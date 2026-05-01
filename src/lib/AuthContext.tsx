@@ -83,7 +83,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const timeoutPromise = new Promise((_, reject) => {
         const errorMsg = "Firebase connection timed out. Check your browser shields or internet.";
-        setTimeout(() => reject(new Error(errorMsg)), 25000);
+        setTimeout(() => reject(new Error(errorMsg)), 25000); // 25 seconds
       });
 
       const webAuthRef = ref(db, "web_auth");
@@ -113,7 +113,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error("Invalid access key.");
       }
     } catch (err: any) {
-      // FIX: Alert is now correctly inside the catch block
       alert("DEBUG ERROR: " + (err.message || err.toString()));
       console.error("REAL FIREBASE ERROR:", err);
       throw new Error(err.message || "Failed to log in.");
