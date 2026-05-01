@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getDatabase, forceLongPolling } from "firebase/database";
+import { getDatabase } from "firebase/database";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -13,12 +13,3 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const db = getDatabase(app);
-
-// FORCE LONG POLLING: This is the magic fix. 
-// It bypasses strict ISP network blocks by forcing Firebase to use standard HTTP instead of WebSockets.
-try {
-  forceLongPolling(db);
-  console.log("Network constraint bypassed: Forced Long Polling enabled.");
-} catch (error) {
-  console.warn("Could not force long polling:", error);
-}
