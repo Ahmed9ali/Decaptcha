@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { ref, onValue, set } from "firebase/database";
+import { ref, query, orderByChild, equalTo, get, onValue, set } from "firebase/database";
 import { db } from "./firebase"; 
 
 interface UserProfile {
@@ -8,18 +8,9 @@ interface UserProfile {
   points: number;
   email: string;
   username: string;
-  captchaStats?: {
-    text?: { dailyCount: number; lastSolvedDate: string };
-  };
-  dailyCheckin?: {
-    currentStreak: number;
-    lastCheckinTimestamp: number;
-  };
-  security_stats?: {
-    status: string;
-    is_modded: boolean;
-    is_vpn: boolean;
-  };
+  captchaStats?: { text?: { dailyCount: number; lastSolvedDate: string }; };
+  dailyCheckin?: { currentStreak: number; lastCheckinTimestamp: number; };
+  security_stats?: { status: string; is_modded: boolean; is_vpn: boolean; };
 }
 
 interface AuthContextType {
@@ -30,10 +21,7 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType>({
-  user: null,
-  loading: true,
-  loginWithOtp: async () => {},
-  logout: () => {},
+  user: null, loading: true, loginWithOtp: async () => {}, logout: () => {},
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -42,11 +30,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const storedUid = localStorage.getItem("decaptcha_uid");
-    if (storedUid) {
-      subscribeToUser(storedUid);
-    } else {
-      setLoading(false);
-    }
+    if (storedUid) { subscribeToUser(storedUid); } 
+    else { setLoading(false); }
   }, []);
 
   const subscribeToUser = (uid: string) => {
@@ -54,13 +39,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const userRef = ref(db, `users/${uid}`);
       onValue(userRef, async (snapshot) => {
         if (snapshot.exists()) {
-          const data = snapshot.val();
-          setUser({ uid, ...data });
+          setUser({ uid, ...snapshot.val() });
         } else {
           const newUser = {
-            balance: 0,
-            points: 0,
-            email: "user@decaptcha.app",
+            balance: 0, points: 0, email: "user@decaptcha.app",
             username: `User${uid.substring(0, 4)}`,
             security_stats: { status: "active", is_modded: false, is_vpn: false }
           };
@@ -81,44 +63,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginWithOtp = async (otp: string) => {
     try {
-      // 1. HARDCODED URL: Completely bypass Vite's buggy .env loader!
-      const cleanDbUrl = "https://captchacashhd-default-rtdb.firebaseio.com";
-      const fetchUrl = `${cleanDbUrl}/web_auth.json?orderBy="otp"&equalTo="${otp}"`;
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("Firebase connection timed out.")), 15000);
+      });
 
-      // 2. Set a 10-second timeout for the fetch
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const webAuthRef = ref(db, "web_auth");
+      const q = query(webAuthRef, orderByChild("otp"), equalTo(otp));
+      const snapshot = await Promise.race([get(q), timeoutPromise]) as any;
 
-      // 3. Make the raw HTTP request
-      const response = await fetch(fetchUrl, { signal: controller.signal });
-      clearTimeout(timeoutId);
+      if (snapshot.exists()) {
+        let matchedUid = null;
+        let valid = false;
+        
+        snapshot.forEach((childSnapshot: any) => {
+          const data = childSnapshot.val();
+          if (data.expires_at > Date.now()) {
+            matchedUid = childSnapshot.key;
+            valid = true;
+          }
+        });
 
-      // If it still 404s, this will print the EXACT URL it tried to reach so we can see what's wrong
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status} on URL: \n${fetchUrl}`);
-      }
-
-      const data = await response.json();
-
-      // 4. Check if we found a matching OTP
-      if (data && Object.keys(data).length > 0 && typeof data === 'object') {
-        const matchedUid = Object.keys(data)[0];
-        const authData = data[matchedUid];
-
-        if (authData.expires_at > Date.now()) {
+        if (valid && matchedUid) {
           localStorage.setItem("decaptcha_uid", matchedUid);
-          await subscribeToUser(matchedUid); 
+          await subscribeToUser(matchedUid);
           return;
         } else {
-          throw new Error("OTP expired. Please request a new one.");
+          throw new Error("OTP expired.");
         }
       } else {
         throw new Error("Invalid access key.");
       }
-
     } catch (err: any) {
-      alert("REST FETCH ERROR: " + (err.message || err.toString()));
-      console.error("RAW FETCH ERROR:", err);
+      alert("ERROR: " + (err.message || err.toString()));
       throw new Error(err.message || "Failed to log in.");
     }
   };
