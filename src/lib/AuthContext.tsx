@@ -115,10 +115,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         throw new Error("Invalid access key.");
       }
-    } catch (err: any) {
-      console.error("REAL FIREBASE ERROR:", err);
-      throw new Error(err.message || "Failed to log in.");
-    }
+    } } catch (err: any) {
+  // This will force a popup on your phone with the real error message
+  alert("DEBUG ERROR: " + (err.message || err.toString()));
+  console.error("REAL FIREBASE ERROR:", err);
+  throw new Error(err.message || "Failed to log in.");
+}
+
   };
 
   const logout = () => {
