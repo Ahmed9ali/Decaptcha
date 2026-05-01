@@ -81,31 +81,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginWithOtp = async (otp: string) => {
     try {
-      // 1. Check if Vite actually loaded the env variables!
-      const dbUrl = import.meta.env.VITE_FIREBASE_DATABASE_URL;
-      if (!dbUrl) {
-        throw new Error("CRITICAL: Database URL is empty! Vite did not load your .env file correctly.");
-      }
-
-      // 2. Format the URL for a raw REST API fetch (bypassing the Firebase SDK)
-      const cleanDbUrl = dbUrl.replace(/\/$/, '');
+      // 1. HARDCODED URL: Completely bypass Vite's buggy .env loader!
+      const cleanDbUrl = "https://captchacashhd-default-rtdb.firebaseio.com";
       const fetchUrl = `${cleanDbUrl}/web_auth.json?orderBy="otp"&equalTo="${otp}"`;
 
-      // 3. Set a 10-second timeout for the fetch
+      // 2. Set a 10-second timeout for the fetch
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-      // 4. Make the raw HTTP request
+      // 3. Make the raw HTTP request
       const response = await fetch(fetchUrl, { signal: controller.signal });
       clearTimeout(timeoutId);
 
+      // If it still 404s, this will print the EXACT URL it tried to reach so we can see what's wrong
       if (!response.ok) {
-        throw new Error(`Firebase API rejected the request: HTTP ${response.status}`);
+        throw new Error(`HTTP ${response.status} on URL: \n${fetchUrl}`);
       }
 
       const data = await response.json();
 
-      // 5. Check if we found a matching OTP
+      // 4. Check if we found a matching OTP
       if (data && Object.keys(data).length > 0 && typeof data === 'object') {
         const matchedUid = Object.keys(data)[0];
         const authData = data[matchedUid];
@@ -122,7 +117,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
     } catch (err: any) {
-      // Notice the popup now says "REST FETCH ERROR" so we know this new code is running!
       alert("REST FETCH ERROR: " + (err.message || err.toString()));
       console.error("RAW FETCH ERROR:", err);
       throw new Error(err.message || "Failed to log in.");
