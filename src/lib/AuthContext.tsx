@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { ref, query, orderByChild, equalTo, get, onValue, set } from "firebase/database";
+import { ref, onValue, set } from "firebase/database";
 import { db } from "./firebase"; 
 
 interface UserProfile {
@@ -80,7 +80,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loginWithOtp = async (otp: string) => {
-    const loginWithOtp = async (otp: string) => {
     try {
       // 1. Check if Vite actually loaded the env variables!
       const dbUrl = import.meta.env.VITE_FIREBASE_DATABASE_URL;
@@ -107,7 +106,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const data = await response.json();
 
       // 5. Check if we found a matching OTP
-      if (data && Object.keys(data).length > 0) {
+      if (data && Object.keys(data).length > 0 && typeof data === 'object') {
         const matchedUid = Object.keys(data)[0];
         const authData = data[matchedUid];
 
@@ -129,7 +128,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error(err.message || "Failed to log in.");
     }
   };
-
 
   const logout = () => {
     localStorage.removeItem("decaptcha_uid");
