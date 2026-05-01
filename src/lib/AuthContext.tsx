@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { ref, query, orderByChild, equalTo, get, onValue, set } from "firebase/database";
+import { ref, query, orderByChild, equalTo, get, onValue } from "firebase/database";
 import { db } from "./firebase"; 
 
 interface UserProfile {
@@ -8,9 +8,18 @@ interface UserProfile {
   points: number;
   email: string;
   username: string;
-  captchaStats?: { text?: { dailyCount: number; lastSolvedDate: string }; };
-  dailyCheckin?: { currentStreak: number; lastCheckinTimestamp: number; };
-  security_stats?: { status: string; is_modded: boolean; is_vpn: boolean; };
+  captchaStats?: {
+    text?: { dailyCount: number; lastSolvedDate: string };
+  };
+  dailyCheckin?: {
+    currentStreak: number;
+    lastCheckinTimestamp: number;
+  };
+  security_stats?: {
+    status: string;
+    is_modded: boolean;
+    is_vpn: boolean;
+  };
 }
 
 interface AuthContextType {
@@ -21,7 +30,10 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType>({
-  user: null, loading: true, loginWithOtp: async () => {}, logout: () => {},
+  user: null,
+  loading: true,
+  loginWithOtp: async () => {},
+  logout: () => {},
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -30,27 +42,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const storedUid = localStorage.getItem("decaptcha_uid");
-    if (storedUid) { subscribeToUser(storedUid); } 
-    else { setLoading(false); }
+    if (storedUid) {
+      subscribeToUser(storedUid);
+    } else {
+      setLoading(false);
+    }
   }, []);
 
   const subscribeToUser = (uid: string) => {
     return new Promise<void>((resolve, reject) => {
       const userRef = ref(db, `users/${uid}`);
+      
       onValue(userRef, async (snapshot) => {
         if (snapshot.exists()) {
-          setUser({ uid, ...snapshot.val() });
+          const data = snapshot.val();
+          setUser({ uid, ...data });
+          setLoading(false);
+          resolve();
         } else {
-          const newUser = {
-            balance: 0, points: 0, email: "user@decaptcha.app",
-            username: `User${uid.substring(0, 4)}`,
-            security_stats: { status: "active", is_modded: false, is_vpn: false }
-          };
-          await set(userRef, newUser);
-          setUser({ uid, ...newUser });
+          // FIX: Stop trying to write to the DB. If they don't exist, reject the login.
+          setLoading(false);
+          reject(new Error("User profile not found. Please register on the Android app first."));
         }
-        setLoading(false);
-        resolve();
       }, (error) => {
         console.error("Firebase subscription error:", error);
         setUser(null);
@@ -64,7 +77,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginWithOtp = async (otp: string) => {
     try {
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error("Firebase connection timed out.")), 15000);
+        setTimeout(() => reject(new Error("Firebase connection timed out. Please check your internet.")), 15000);
       });
 
       const webAuthRef = ref(db, "web_auth");
@@ -88,7 +101,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await subscribeToUser(matchedUid);
           return;
         } else {
-          throw new Error("OTP expired.");
+          throw new Error("OTP expired. Please request a new one.");
         }
       } else {
         throw new Error("Invalid access key.");
