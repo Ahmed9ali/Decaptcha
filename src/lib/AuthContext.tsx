@@ -83,10 +83,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginWithOtp = async (otp: string) => {
     try {
-      // 10 second timeout for Firebase RTDB connection
+      // Extended to 25 seconds to allow for mobile network Long-Polling fallback
       const timeoutPromise = new Promise((_, reject) => {
-        const errorMsg = "Firebase connection timed out. Please check your internet connection or verify the 'web_auth' node exists in your Firebase Database Rules.";
-        setTimeout(() => reject(new Error(errorMsg)), 10000);
+        const errorMsg = "Firebase connection timed out. Your browser's privacy shields (Firefox/Brave) might be blocking WebSockets. Please try standard Google Chrome.";
+        setTimeout(() => reject(new Error(errorMsg)), 25000);
       });
 
       const webAuthRef = ref(db, "web_auth");
@@ -110,13 +110,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await subscribeToUser(matchedUid);
           return;
         } else {
-          throw new Error("OTP expired");
+          throw new Error("OTP expired. Please request a new one.");
         }
       } else {
-        throw new Error("Invalid access key");
+        throw new Error("Invalid access key.");
       }
     } catch (err: any) {
-      // THIS will print the actual Firebase error (like Permission Denied) to your browser console!
       console.error("REAL FIREBASE ERROR:", err);
       throw new Error(err.message || "Failed to log in.");
     }
