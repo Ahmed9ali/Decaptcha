@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { ref, query, orderByChild, equalTo, get, onValue, set } from "firebase/database";
-import { db } from "./firebase"; // Make sure this path points to the file above
+import { db } from "./firebase"; 
 
 interface UserProfile {
   uid: string;
@@ -52,13 +52,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const subscribeToUser = (uid: string) => {
     return new Promise<void>((resolve, reject) => {
       const userRef = ref(db, `users/${uid}`);
-      
       onValue(userRef, async (snapshot) => {
         if (snapshot.exists()) {
           const data = snapshot.val();
           setUser({ uid, ...data });
         } else {
-          // If user node doesn't exist, create it so they can log in
           const newUser = {
             balance: 0,
             points: 0,
@@ -83,9 +81,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginWithOtp = async (otp: string) => {
     try {
-      // Extended to 25 seconds to allow for mobile network Long-Polling fallback
       const timeoutPromise = new Promise((_, reject) => {
-        const errorMsg = "Firebase connection timed out. Your browser's privacy shields (Firefox/Brave) might be blocking WebSockets. Please try standard Google Chrome.";
+        const errorMsg = "Firebase connection timed out. Check your browser shields or internet.";
         setTimeout(() => reject(new Error(errorMsg)), 25000);
       });
 
@@ -110,18 +107,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await subscribeToUser(matchedUid);
           return;
         } else {
-          throw new Error("OTP expired. Please request a new one.");
+          throw new Error("OTP expired.");
         }
       } else {
         throw new Error("Invalid access key.");
       }
-    } } catch (err: any) {
-  // This will force a popup on your phone with the real error message
-  alert("DEBUG ERROR: " + (err.message || err.toString()));
-  console.error("REAL FIREBASE ERROR:", err);
-  throw new Error(err.message || "Failed to log in.");
-}
-
+    } catch (err: any) {
+      // FIX: Alert is now correctly inside the catch block
+      alert("DEBUG ERROR: " + (err.message || err.toString()));
+      console.error("REAL FIREBASE ERROR:", err);
+      throw new Error(err.message || "Failed to log in.");
+    }
   };
 
   const logout = () => {
