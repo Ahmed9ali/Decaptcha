@@ -1,6 +1,6 @@
 import { Mail, Send, HelpCircle, MessageSquare, Phone, MapPin, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
-import { useFaqs } from '../hooks/useFaqs';
+import { useFaqs } from '../lib/useFaqs';
 import { useMessages } from '../hooks/useMessages';
 
 export default function Contact() {

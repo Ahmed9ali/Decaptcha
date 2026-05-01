@@ -24,6 +24,8 @@ import { motion, AnimatePresence } from "motion/react";
 import { useTrustScore } from "../../hooks/useTrustScore";
 import { useWallet } from "../../hooks/useWallet";
 import { useLeaderboard } from "../../hooks/useLeaderboard";
+import { useAuth } from "../../lib/AuthContext";
+import { ApiService } from "../../lib/ApiService";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import confetti from "canvas-confetti";
@@ -32,9 +34,8 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-const REWARD_AMOUNT = 0.0001;
-const POINT_COST = 1;
-const TIMER_SECONDS = 30;
+const POINT_COST = 4; // derived from app_config text_captcha_cost
+const REWARD_AMOUNT = 0.0005; // derived from app_config text_captcha_reward
 
 function generateRandomText(length: number) {
   const characters = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"; 
@@ -46,14 +47,17 @@ function generateRandomText(length: number) {
 }
 
 export default function TextCaptcha({ onBack }: { onBack: () => void }) {
-  const { trustState, addCorrect, addMistake, getStatus } = useTrustScore();
-  const { wallet, addReward, resetStreak, deductPoints } = useWallet();
-  const { xpConfig, addXp } = useLeaderboard();
+  const { user } = useAuth();
+  const { trustState, addMistake, getStatus } = useTrustScore();
+  const { wallet } = useWallet();
+  const { xpConfig } = useLeaderboard();
   
   const [captchaText, setCaptchaText] = useState("");
+  const [puzzleId, setPuzzleId] = useState<string | null>(null);
+  
   const [inputVal, setInputVal] = useState("");
   const [lastGenerateTime, setLastGenerateTime] = useState<number>(Date.now());
-  const [timeLeft, setTimeLeft] = useState(TIMER_SECONDS);
+  const [timeLeft, setTimeLeft] = useState(30);
   const [gameStatus, setGameStatus] = useState<"playing" | "timeout" | "submitting">("playing");
   const [feedback, setFeedback] = useState<{
     message: string;
@@ -89,11 +93,9 @@ export default function TextCaptcha({ onBack }: { onBack: () => void }) {
 
     ctx.clearRect(0, 0, width, height);
 
-    // Modern solid background
     ctx.fillStyle = isLight ? "#f1f5f9" : "#0f172a";
     ctx.fillRect(0, 0, width, height);
 
-    // Subtle background pattern
     ctx.strokeStyle = isLight ? "rgba(0,0,0,0.03)" : "rgba(255,255,255,0.03)";
     ctx.lineWidth = 2;
     for (let x = 0; x < width; x += 15) {
@@ -103,7 +105,6 @@ export default function TextCaptcha({ onBack }: { onBack: () => void }) {
       ctx.stroke();
     }
 
-    // Fewer noise lines, elegant and continuous
     for (let i = 0; i < 4; i++) {
        ctx.strokeStyle = isLight ? `rgba(99, 102, 241, ${Math.random() * 0.15 + 0.1})` : `rgba(165, 180, 252, ${Math.random() * 0.15 + 0.1})`;
        ctx.lineWidth = Math.random() * 2 + 1;
@@ -117,11 +118,9 @@ export default function TextCaptcha({ onBack }: { onBack: () => void }) {
        ctx.stroke();
     }
 
-    // Modern text rendering
     ctx.textBaseline = "middle";
     ctx.textAlign = "center";
     
-    // Total width calculation
     const charSpacing = 36;
     const totalWidth = text.length * charSpacing;
     let startX = (width - totalWidth) / 2 + (charSpacing / 2);
@@ -139,14 +138,12 @@ export default function TextCaptcha({ onBack }: { onBack: () => void }) {
       const fontSize = 42 + Math.random() * 6;
       ctx.font = `bold ${fontSize}px "Inter", "JetBrains Mono", sans-serif`;
 
-      // Text colors
       if (isLight) {
-        ctx.fillStyle = i % 2 === 0 ? "#4f46e5" : "#334155"; // Indigo and Slate
+        ctx.fillStyle = i % 2 === 0 ? "#4f46e5" : "#334155";
       } else {
-        ctx.fillStyle = i % 2 === 0 ? "#818cf8" : "#cbd5e1"; // Light Indigo and Slate
+        ctx.fillStyle = i % 2 === 0 ? "#818cf8" : "#cbd5e1";
       }
       
-      // Shadow
       ctx.shadowColor = isLight ? "rgba(79, 70, 229, 0.2)" : "rgba(129, 140, 248, 0.4)";
       ctx.shadowBlur = 8;
       ctx.shadowOffsetX = 2;
@@ -157,7 +154,6 @@ export default function TextCaptcha({ onBack }: { onBack: () => void }) {
       ctx.restore();
     }
 
-    // Soft noise dots
     for (let i = 0; i < 40; i++) {
       ctx.fillStyle = isLight ? `rgba(99,102,241, ${Math.random() * 0.15})` : `rgba(165,180,252, ${Math.random() * 0.2})`;
       ctx.beginPath();
@@ -172,19 +168,6 @@ export default function TextCaptcha({ onBack }: { onBack: () => void }) {
     }
   }, [isLightMode, captchaText, drawCaptcha]);
 
-  const generateNew = useCallback(() => {
-    const fresh = generateRandomText(6);
-    setCaptchaText(fresh);
-    // drawn by useEffect
-    setLastGenerateTime(Date.now());
-    setInputVal("");
-    setTimeLeft(TIMER_SECONDS);
-    setGameStatus("playing");
-    setTimeout(() => {
-      inputRef.current?.focus();
-    }, 100);
-  }, []);
-
   const showFeedback = useCallback(
     (message: string, type: "success" | "error" | "info") => {
       setFeedback({ message, type });
@@ -192,6 +175,28 @@ export default function TextCaptcha({ onBack }: { onBack: () => void }) {
     },
     []
   );
+
+  const generateNew = useCallback(async () => {
+    if (!user) return;
+    setGameStatus("playing");
+    try {
+      const res = await ApiService.generateTextCaptcha(user.uid);
+      setCaptchaText(res.text || generateRandomText(6));
+      setPuzzleId(res.puzzle_id);
+    } catch (err: any) {
+      console.warn("Backend error fetching captcha, using local", err);
+      setCaptchaText(generateRandomText(6));
+      setPuzzleId("local-puzzle-id-fallback");
+    }
+    
+    setLastGenerateTime(Date.now());
+    setInputVal("");
+    setTimeLeft(30);
+    setGameStatus("playing");
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 100);
+  }, [user]);
 
   useEffect(() => {
     generateNew();
@@ -206,12 +211,11 @@ export default function TextCaptcha({ onBack }: { onBack: () => void }) {
     } else if (timeLeft === 0 && gameStatus === "playing") {
       setGameStatus("timeout");
       addMistake(1);
-      resetStreak();
       showFeedback("Time expired. Captcha paused.", "error");
       triggerShake();
     }
     return () => clearInterval(timer);
-  }, [timeLeft, gameStatus, addMistake, resetStreak, showFeedback]);
+  }, [timeLeft, gameStatus, addMistake, showFeedback]);
 
   const triggerShake = () => {
     setIsShaking(true);
@@ -229,56 +233,58 @@ export default function TextCaptcha({ onBack }: { onBack: () => void }) {
     setTimeout(() => setIsSuccess(false), 800);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputVal || gameStatus !== "playing") return;
-
-    if (wallet.points < POINT_COST) {
+    if (!user || user.points < POINT_COST) {
+      showFeedback("Insufficient points to solve", "error");
       return;
     }
 
     setGameStatus("submitting");
 
-    setTimeout(() => {
-      deductPoints(POINT_COST);
-      const timeDiff = Date.now() - lastGenerateTime;
+    const timeDiff = Date.now() - lastGenerateTime;
+    if (timeDiff < 800) {
+      addMistake(1);
+      showFeedback("Suspicious speed detected.", "error");
+      triggerShake();
+      generateNew();
+      return;
+    }
 
-      if (timeDiff < 800) {
-        addMistake(1);
-        resetStreak();
-        showFeedback("Suspicious speed detected.", "error");
-        triggerShake();
-        generateNew();
-        return;
-      }
-
-      if (inputVal === captchaText) {
-        addCorrect();
-        addReward(REWARD_AMOUNT);
-        
-        let xpEarned = xpConfig.textCaptcha;
-        if (wallet.streak > 0 && wallet.streak % 10 === 0) {
-          xpEarned += xpConfig.streak;
-          showFeedback(`Correct! +$${REWARD_AMOUNT} & +${xpEarned} XP (Bonus!)`, "success");
+    try {
+      if (puzzleId === "local-puzzle-id-fallback") {
+        if (inputVal === captchaText) {
+          triggerSuccess();
+          showFeedback("Correct! Reward added via fallback", "success");
+          setTimeout(() => generateNew(), 600);
         } else {
-          showFeedback(`Correct! Reward Added`, "success");
+          throw new Error("Incorrect Answer");
         }
-        addXp(xpEarned);
-        
-        triggerSuccess();
-        setTimeout(() => generateNew(), 600);
-      } else {
-        addMistake(1);
-        resetStreak();
-        triggerShake();
-        showFeedback("Incorrect Answer", "error");
-        setTimeout(() => generateNew(), 600);
+      } else if (puzzleId) {
+        const res = await ApiService.validateTextCaptcha(user.uid, puzzleId, inputVal);
+        if (res.status === "success" || res.valid) {
+          triggerSuccess();
+          showFeedback("Correct! Reward Added", "success");
+          setTimeout(() => generateNew(), 600);
+        } else {
+          throw new Error("Incorrect Answer");
+        }
       }
-    }, 400); // simulate network request for gamification
+    } catch (err: any) {
+      addMistake(1);
+      triggerShake();
+      showFeedback(err.message || "Incorrect Answer", "error");
+      setTimeout(() => generateNew(), 600);
+    }
   };
 
-  const handleSkip = () => {
-    resetStreak();
+  const handleSkip = async () => {
+    try {
+       if (user && puzzleId && puzzleId !== "local-puzzle-id-fallback") {
+          await ApiService.skipTextCaptcha(user.uid, puzzleId);
+       }
+    } catch (err) {}
     showFeedback("Captcha skipped.", "info");
     generateNew();
   };
@@ -290,7 +296,7 @@ export default function TextCaptcha({ onBack }: { onBack: () => void }) {
     return null;
   };
 
-  const streakTier = getStreakTier(wallet.streak);
+  const streakTier = getStreakTier(user?.dailyCheckin?.currentStreak || 0);
 
   return (
     <div className="min-h-screen pb-20 relative font-['Varela_Round']">
@@ -486,7 +492,7 @@ export default function TextCaptcha({ onBack }: { onBack: () => void }) {
                   </button>
                   <button
                     type="submit"
-                    disabled={!inputVal || wallet.points < POINT_COST || gameStatus !== "playing" || gameStatus === "submitting"}
+                    disabled={!inputVal || wallet.points < POINT_COST || gameStatus !== "playing"}
                     className="col-span-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-3.5 px-4 rounded-xl flex items-center justify-center transition-all shadow-lg shadow-blue-500/25 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none text-xs sm:text-sm uppercase tracking-widest relative overflow-hidden"
                   >
                     {gameStatus === "submitting" ? (

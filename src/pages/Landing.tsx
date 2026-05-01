@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Key,
@@ -23,9 +23,12 @@ import {
   ChevronDown,
   MessageSquare,
   Mail,
+  Trophy,
+  ArrowUp,
 } from "lucide-react";
 
 import { ThemeToggle } from "../App";
+import { useAuth } from "../lib/AuthContext";
 
 export default function Landing({
   onLogin,
@@ -34,31 +37,47 @@ export default function Landing({
   onLogin: (role?: "user" | "admin") => void;
   onNavigate: (page: string) => void;
 }) {
+  const { loginWithOtp } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [accessKey, setAccessKey] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [shake, setShake] = useState(false);
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
-  const handleUnlock = (e: React.FormEvent) => {
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowScrollTop(window.scrollY > 400);
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleUnlock = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
     setShake(false);
 
-    setTimeout(() => {
-      if (accessKey === "1234") {
-        onLogin("user");
-      } else if (accessKey === "Administrator") {
+    try {
+      if (accessKey === "Administrator") {
         onLogin("admin");
       } else {
-        setError("Invalid Access Key");
-        setShake(true);
-        setLoading(false);
-        setTimeout(() => setShake(false), 500);
+        await loginWithOtp(accessKey);
+        onLogin("user");
       }
-    }, 800);
+    } catch (err: any) {
+        setError(err.message || "Invalid Access Key");
+        setShake(true);
+        setTimeout(() => setShake(false), 500);
+    } finally {
+        setLoading(false);
+    }
   };
 
   const navLinks = [
@@ -223,13 +242,24 @@ export default function Landing({
                       type="password"
                       value={accessKey}
                       onChange={(e) => setAccessKey(e.target.value)}
-                      placeholder="Enter key or admin access"
+                      placeholder="Enter 6 digit Access key"
                       className={`w-full bg-navy-light/50 border ${error ? "border-red-500/50" : "border-glass-border"} rounded-xl px-4 py-4 pl-12 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-accent transition-all`}
                       autoFocus
                       disabled={loading}
                     />
                     <Key className="w-5 h-5 text-slate-500 absolute left-4 top-4.5" />
                   </div>
+                  
+                  <p className="text-center text-xs text-slate-400 mt-2">
+                    Don't have one?{" "}
+                    <button
+                      type="button"
+                      onClick={() => onNavigate("get-key")}
+                      className="text-blue-400 hover:text-blue-300 underline font-medium"
+                    >
+                      Find Now?
+                    </button>
+                  </p>
 
                   <AnimatePresence>
                     {error && (
@@ -312,12 +342,15 @@ export default function Landing({
               Start Earning Now
               <ArrowRight className="w-5 h-5" />
             </button>
-            <a
-              href="#features"
+            <button
+              onClick={() => {
+                const element = document.getElementById("how-it-works");
+                element?.scrollIntoView({ behavior: "smooth" });
+              }}
               className="w-full sm:w-auto bg-white/5 hover:bg-white/10 hover:shadow-[0_0_20px_rgba(255,255,255,0.1)] text-slate-200 hover:text-white font-medium py-4 px-8 rounded-xl border border-glass-border hover:border-white/30 transition-all text-center text-lg"
             >
               Learn More
-            </a>
+            </button>
           </motion.div>
 
           <motion.div
@@ -481,7 +514,7 @@ export default function Landing({
             <div className="text-center">
               <div className="text-4xl font-bold text-white mb-2">24/7</div>
               <div className="text-sm text-slate-400 uppercase tracking-widest font-bold">
-                Anti-Cheat Protection
+                Support
               </div>
             </div>
           </div>
@@ -716,55 +749,91 @@ export default function Landing({
               Climb the ranks and earn additional weekly bonuses.
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 items-end mt-16 pb-8">
             {[
-              { rank: 1, name: "CryptoKing99", earn: "$142.50", acc: "99.8%" },
-              { rank: 2, name: "SolverPro", earn: "$128.20", acc: "98.5%" },
-              { rank: 3, name: "FastFingers", earn: "$115.00", acc: "99.1%" },
-              { rank: 4, name: "CaptchaMaster", earn: "$98.45", acc: "97.9%" },
-              { rank: 5, name: "NightOwl", earn: "$95.10", acc: "99.5%" },
+              { rank: 1, name: "CryptoKing99", earn: "$142.50", acc: "99.8%", avatar: "from-yellow-400 to-amber-600" },
+              { rank: 2, name: "SolverPro", earn: "$128.20", acc: "98.5%", avatar: "from-slate-300 to-slate-500" },
+              { rank: 3, name: "FastFingers", earn: "$115.00", acc: "99.1%", avatar: "from-orange-400 to-red-500" },
+              { rank: 4, name: "CaptchaMaster", earn: "$98.45", acc: "97.9%", avatar: "from-blue-500 to-indigo-600" },
+              { rank: 5, name: "NightOwl", earn: "$95.10", acc: "99.5%", avatar: "from-indigo-500 to-purple-600" },
             ].map((u, i) => (
               <div
                 key={i}
-                className="glass-panel p-6 rounded-3xl border border-white/5 hover:border-white/10 transition-transform hover:-translate-y-2 flex flex-col items-center text-center relative overflow-hidden group"
+                className={`w-full bg-navy/60 backdrop-blur-2xl rounded-[2.5rem] border transition-all duration-500 flex flex-col items-center text-center relative group overflow-hidden
+                  ${
+                    i === 0 
+                      ? "border-yellow-500/30 hover:border-yellow-400/60 shadow-[0_0_40px_rgba(234,179,8,0.15)] hover:shadow-[0_0_60px_rgba(234,179,8,0.3)] lg:-mt-12 pb-12 pt-12 z-30 order-1 lg:order-3" 
+                      : i === 1 
+                        ? "border-slate-300/20 hover:border-slate-300/50 shadow-[0_0_30px_rgba(203,213,225,0.1)] hover:shadow-[0_0_40px_rgba(203,213,225,0.2)] lg:-mt-6 pb-10 pt-10 z-20 order-2 lg:order-2"
+                        : i === 2
+                          ? "border-orange-500/20 hover:border-orange-500/50 shadow-[0_0_30px_rgba(249,115,22,0.1)] hover:shadow-[0_0_40px_rgba(249,115,22,0.2)] lg:-mt-6 pb-10 pt-10 z-20 order-3 lg:order-4"
+                          : i === 3
+                            ? "border-white/5 hover:border-white/20 pb-8 pt-8 z-10 order-4 lg:order-1"
+                            : "border-white/5 hover:border-white/20 pb-8 pt-8 z-10 order-5 lg:order-5"
+                  }
+                `}
               >
-                {i < 3 && (
-                  <div
-                    className={`absolute top-0 inset-x-0 h-1 bg-gradient-to-r ${i === 0 ? "from-yellow-400 to-yellow-600" : i === 1 ? "from-slate-300 to-slate-500" : "from-orange-400 to-orange-600"}`}
-                  ></div>
-                )}
-
+                {/* Background Glow */}
                 <div
-                  className={`absolute -top-4 -right-4 w-16 h-16 rounded-full blur-[20px] ${i === 0 ? "bg-yellow-500/20" : i === 1 ? "bg-slate-400/20" : i === 2 ? "bg-orange-500/20" : "bg-transparent"}`}
+                  className={`absolute top-0 inset-x-0 h-40 opacity-20 blur-[50px] transition-opacity duration-500 group-hover:opacity-40 pointer-events-none
+                    ${i === 0 ? "bg-yellow-500" : i === 1 ? "bg-slate-300" : i === 2 ? "bg-orange-500" : "bg-blue-500"}
+                  `}
                 ></div>
 
+                {/* Rank Badge */}
                 <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center font-bold mb-4 ${
-                    i === 0
-                      ? "bg-yellow-500/20 text-yellow-400 ring-1 ring-yellow-400/50"
-                      : i === 1
-                        ? "bg-slate-300/20 text-slate-300 ring-1 ring-slate-300/50"
-                        : i === 2
-                          ? "bg-orange-600/20 text-orange-400 ring-1 ring-orange-500/50"
-                          : "bg-white/5 text-slate-500 border border-white/10"
-                  }`}
+                  className={`absolute top-0 inset-x-0 flex justify-center -translate-y-px`}
                 >
-                  #{u.rank}
+                  <div className={`px-5 py-1.5 rounded-b-2xl font-black text-sm tracking-widest flex items-center gap-1.5 shadow-lg border-x border-b
+                    ${
+                      i === 0
+                        ? "bg-gradient-to-r from-yellow-500 to-amber-500 text-yellow-950 border-yellow-400 shadow-yellow-500/30"
+                        : i === 1
+                          ? "bg-gradient-to-r from-slate-200 to-slate-400 text-slate-900 border-slate-300 shadow-slate-400/30"
+                          : i === 2
+                            ? "bg-gradient-to-r from-orange-400 to-red-500 text-red-950 border-orange-400 shadow-orange-500/30"
+                            : "bg-navy-light text-slate-300 border-white/10"
+                    }`}
+                  >
+                    {i < 3 && <Trophy className="w-4 h-4" />}
+                    RANK {u.rank}
+                  </div>
                 </div>
 
-                <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center font-bold text-white text-xl mb-3 shadow-[0_0_15px_rgba(37,99,235,0.3)]">
-                  {u.name[0]}
+                {/* Avatar */}
+                <div className={`w-28 h-28 mt-6 rounded-[2rem] rotate-3 group-hover:rotate-6 transition-transform duration-500 bg-gradient-to-br ${u.avatar} flex items-center justify-center shadow-2xl relative z-10 border-4 border-navy`}>
+                  <div className="-rotate-3 group-hover:-rotate-6 transition-transform duration-500 font-black text-white text-5xl drop-shadow-md">
+                    {u.name[0]}
+                  </div>
                 </div>
 
-                <span className="font-bold text-md text-white mb-1">
+                {/* User Info */}
+                <span className="font-extrabold text-2xl text-white mt-6 mb-1 relative z-10">
                   {u.name}
                 </span>
-                <span className="text-xs text-slate-400 mb-4 h-4 bg-navy px-2 py-0.5 rounded-full border border-white/5">
-                  Acc: {u.acc}
+                
+                <span className="text-xs font-bold text-slate-400 mb-8 tracking-widest uppercase relative z-10 bg-white/5 py-1 px-3 rounded-full border border-white/5">
+                  Accuracy: <span className="text-emerald-400">{u.acc}</span>
                 </span>
 
-                <div className="text-2xl font-bold text-emerald-400 font-mono mt-auto">
-                  {u.earn}
+                {/* Earnings */}
+                <div className="mt-auto w-full px-6 relative z-10">
+                  <div className={`py-5 rounded-3xl border transition-colors duration-300 ${
+                    i === 0 ? "bg-yellow-500/10 border-yellow-500/20 group-hover:bg-yellow-500/20" : 
+                    i === 1 ? "bg-slate-400/10 border-slate-400/20 group-hover:bg-slate-400/20" : 
+                    i === 2 ? "bg-orange-500/10 border-orange-500/20 group-hover:bg-orange-500/20" : 
+                    "bg-white/5 border-white/5 hover:bg-white/10"
+                  }`}>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Weekly Base</p>
+                    <div className={`text-4xl font-black font-mono ${
+                      i === 0 ? "text-yellow-400 drop-shadow-[0_0_15px_rgba(250,204,21,0.5)]" : 
+                      i === 1 ? "text-slate-200 drop-shadow-[0_0_15px_rgba(203,213,225,0.5)]" : 
+                      i === 2 ? "text-orange-400 drop-shadow-[0_0_15px_rgba(251,146,60,0.5)]" : 
+                      "text-emerald-400"
+                    }`}>
+                      {u.earn}
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
@@ -786,19 +855,24 @@ export default function Landing({
               <h2 className="text-4xl font-bold mb-6">
                 Earn{" "}
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
-                  10% Lifetime
+                  30 Points
                 </span>{" "}
-                Commision
+                Per Referral
               </h2>
               <p className="text-slate-300 text-lg mb-8 max-w-md">
-                Invite friends and colleagues to join DeCaptcha. When they earn,
-                you earn. Automatically credited to your wallet.
+                Invite friends and colleagues to join DeCaptcha. When they sign up using your code, you both earn 30 points instantly.
               </p>
-              <div className="flex items-center gap-4 bg-navy-light/50 border border-white/10 rounded-xl p-4 w-full max-w-sm">
-                <div className="flex-1 font-mono text-sm truncate text-slate-300">
-                  decaptcha.app/ref/Y7X9P2
+              <div className="flex items-center gap-4 bg-navy-light/50 border border-white/10 rounded-xl p-2 pl-6 w-full max-w-sm relative">
+                <div className="flex-1 font-mono text-xl font-bold tracking-widest text-slate-100">
+                  REF-Y7X9
                 </div>
-                <button className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-sm font-bold transition-colors">
+                <button 
+                  onClick={() => {
+                    navigator.clipboard.writeText("REF-Y7X9");
+                    alert("Referral code copied!");
+                  }}
+                  className="bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-lg text-sm font-bold shadow-lg transition-colors text-white"
+                >
                   Copy
                 </button>
               </div>
@@ -807,18 +881,18 @@ export default function Landing({
               {[
                 {
                   step: "1",
-                  title: "Share your link",
-                  desc: "Send your unique referral link to friends on social media or forums.",
+                  title: "Share your code",
+                  desc: "Send your unique referral code to friends on social media or forums.",
                 },
                 {
                   step: "2",
-                  title: "Friends start solving",
-                  desc: "They sign up and start completing tasks to earn their own rewards.",
+                  title: "Friends sign up",
+                  desc: "They create an account and enter your code during registration.",
                 },
                 {
                   step: "3",
-                  title: "You earn automatically",
-                  desc: "10% of their total earnings is instantly added to your balance.",
+                  title: "You earn instantly",
+                  desc: "30 points are instantly added to both of your balances.",
                 },
               ].map((s, i) => (
                 <div
@@ -1023,20 +1097,21 @@ export default function Landing({
       {/* Final CTA */}
       <section className="py-24">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative">
-          <div className="absolute inset-0 bg-blue-600/20 blur-[100px] rounded-full pointer-events-none" />
-          <div className="glass-panel p-12 lg:p-20 rounded-[3rem] border border-blue-500/30 text-center relative z-10 bg-gradient-to-b from-blue-900/40 to-navy overflow-hidden">
-            <h2 className="text-4xl lg:text-6xl font-bold mb-6">
-              Ready to Start Earning?
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-600/30 to-purple-600/30 blur-[120px] rounded-full pointer-events-none" />
+          <div className="glass-panel p-12 lg:p-24 rounded-[3rem] border border-white/10 text-center relative z-10 bg-navy/60 backdrop-blur-2xl overflow-hidden shadow-2xl">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-emerald-500"></div>
+            <h2 className="text-5xl lg:text-7xl font-black mb-6 tracking-tight text-white drop-shadow-sm">
+              Ready to Start <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">Earning?</span>
             </h2>
-            <p className="text-xl text-slate-300 mb-10 max-w-2xl mx-auto">
+            <p className="text-xl text-slate-300 mb-10 max-w-2xl mx-auto leading-relaxed">
               Claim your access key and join thousands of solvers making real
-              rewards every day.
+              rewards every single day. No waiting, no fees.
             </p>
             <button
               onClick={() => setShowLoginModal(true)}
-              className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-5 px-10 rounded-2xl shadow-[0_0_40px_rgba(37,99,235,0.4)] transition-all text-xl inline-flex items-center gap-3 group"
+              className="bg-white text-navy hover:bg-slate-100 font-bold py-5 px-10 rounded-2xl shadow-[0_0_40px_rgba(255,255,255,0.2)] transition-all text-xl inline-flex items-center gap-3 group hover:scale-[1.02] active:scale-[0.98]"
             >
-              Unlock DeCaptcha
+              Unlock
               <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
             </button>
           </div>
@@ -1185,12 +1260,24 @@ export default function Landing({
               &copy; {new Date().getFullYear()} DeCaptcha Platform. All rights
               reserved.
             </div>
-            <div className="mt-4 md:mt-0 font-mono text-xs">
-              Version 2.4.1 (Build 805)
-            </div>
           </div>
         </div>
       </footer>
+
+      {/* Scroll to Top */}
+      <div
+        className={`fixed bottom-8 right-8 z-50 transition-all duration-300 ${
+          showScrollTop ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10 pointer-events-none"
+        }`}
+      >
+        <button
+          onClick={scrollToTop}
+          className="p-3 bg-blue-600 hover:bg-blue-500 text-white rounded-full shadow-lg shadow-blue-500/20 transition-all group border border-blue-400"
+          title="Scroll to Top"
+        >
+          <ArrowUp className="w-6 h-6 group-hover:-translate-y-1 transition-transform" />
+        </button>
+      </div>
     </div>
   );
 }

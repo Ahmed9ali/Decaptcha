@@ -11,13 +11,13 @@ export default function Referrals() {
 
   // Mock data for referrals
   const [referrals] = useState([
-    { id: 1, name: "AliceSmith", captchasSolved: 120, status: "completed", reward: 500 },
-    { id: 2, name: "CryptoNinja", captchasSolved: 45, status: "pending", reward: 500 },
-    { id: 3, name: "MaxPower", captchasSolved: 5, status: "pending", reward: 500 }
+    { id: 1, name: "AliceSmith", captchasSolved: 50, status: "completed", reward: 30 },
+    { id: 2, name: "CryptoNinja", captchasSolved: 45, status: "pending", reward: 30 },
+    { id: 3, name: "MaxPower", captchasSolved: 5, status: "pending", reward: 30 }
   ]);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(referralLink);
+    navigator.clipboard.writeText(referralCode);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -42,14 +42,14 @@ export default function Referrals() {
                 Invite Friends, Earn Rewards
               </h1>
               <p className="text-slate-600 dark:text-slate-300 text-sm max-w-xl leading-relaxed mb-4">
-                Share your referral link with friends. Once they sign up and solve their first <strong className="text-indigo-600 dark:text-indigo-400">100 Captchas</strong>, you both earn <strong className="text-indigo-600 dark:text-indigo-400">500 Points</strong>!
+                Share your referral code with friends. Once they sign up and solve their first <strong className="text-indigo-600 dark:text-indigo-400">50 Captchas</strong>, you earn <strong className="text-indigo-600 dark:text-indigo-400">30 Points</strong> and they earn <strong className="text-indigo-600 dark:text-indigo-400">15 Points</strong>!
               </p>
               
               <div className="flex items-center gap-2 max-w-md mx-auto md:mx-0 bg-white dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-xl p-1 shadow-inner">
                 <input 
                   type="text" 
                   readOnly 
-                  value={referralLink}
+                  value={referralCode}
                   className="bg-transparent border-none text-sm font-medium text-slate-600 dark:text-slate-300 px-3 w-full focus:outline-none"
                 />
                 <button 
@@ -60,7 +60,7 @@ export default function Referrals() {
                   )}
                 >
                   {copied ? <CheckCircle className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                  {copied ? "Copied!" : "Copy Link"}
+                  {copied ? "Copied!" : "Copy Code"}
                 </button>
               </div>
             </div>
@@ -74,22 +74,22 @@ export default function Referrals() {
             <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-3">
               <Share2 className="w-5 h-5" />
             </div>
-            <h4 className="font-bold text-slate-800 dark:text-white mb-1">1. Share your link</h4>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Send your unique link to your friends or followers.</p>
+            <h4 className="font-bold text-slate-800 dark:text-white mb-1">1. Share your Code</h4>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Send your unique code to your friends or followers.</p>
           </div>
           <div className="bg-white/70 dark:bg-[#0b1121]/70 backdrop-blur-xl rounded-2xl p-5 border border-slate-200 dark:border-white/10 shadow-sm flex flex-col items-center text-center">
             <div className="w-12 h-12 rounded-full bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 flex items-center justify-center mb-3">
               <Target className="w-5 h-5" />
             </div>
-            <h4 className="font-bold text-slate-800 dark:text-white mb-1">2. They solve 100 captchas</h4>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Your friend signs up and completes 100 accurate captchas.</p>
+            <h4 className="font-bold text-slate-800 dark:text-white mb-1">2. They solve 50 captchas</h4>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Your friend signs up using your code and completes 50 accurate captchas.</p>
           </div>
           <div className="bg-white/70 dark:bg-[#0b1121]/70 backdrop-blur-xl rounded-2xl p-5 border border-slate-200 dark:border-white/10 shadow-sm flex flex-col items-center text-center">
             <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-3">
               <Gift className="w-5 h-5" />
             </div>
             <h4 className="font-bold text-slate-800 dark:text-white mb-1">3. You both earn!</h4>
-            <p className="text-xs text-slate-500 dark:text-slate-400">You both instantly receive 500 bonus points in your wallet.</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">You instantly receive 30 points and they receive 15 points.</p>
           </div>
         </div>
 
@@ -105,7 +105,7 @@ export default function Referrals() {
           ) : (
             <div className="divide-y divide-slate-100 dark:divide-white/5">
               {referrals.map((ref) => {
-                const progress = Math.min(100, Math.round((ref.captchasSolved / 100) * 100));
+                const progress = Math.min(100, Math.round((ref.captchasSolved / 50) * 100));
                 const isComplete = ref.status === 'completed';
                 
                 return (
@@ -126,7 +126,7 @@ export default function Referrals() {
                       {/* Progress Bar */}
                       <div className="mt-2">
                         <div className="flex justify-between text-xs font-bold text-slate-500 mb-1">
-                          <span>{ref.captchasSolved} / 100 Captchas Solved</span>
+                          <span>{ref.captchasSolved} / 50 Captchas Solved</span>
                           <span>{progress}%</span>
                         </div>
                         <div className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">

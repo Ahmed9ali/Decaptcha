@@ -2,39 +2,60 @@ import React, { useState, useEffect } from "react";
 import { Trophy, Medal, Crown, Zap, Flame, Target, Search, Clock } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useLeaderboard } from "../hooks/useLeaderboard";
+import { ApiService } from "../lib/ApiService";
+import { useAuth } from "../lib/AuthContext";
 
 function getNextMondayIST() {
   const now = new Date();
-  
-  // Create a deeply copied UTC date so we don't mess up local time
   const utcNow = new Date(now.getTime() + now.getTimezoneOffset() * 60000);
-  
-  // IST is UTC+5:30 -> add 5.5 hours to UTC time to get current IST time
   const istTime = new Date(utcNow.getTime() + (5.5 * 3600000));
-  
   const day = istTime.getDay();
-  // If today is Monday but before 12 AM (which is 00:00), wait until today 00:00... wait, 00:00 already passed.
-  // We want NEXT Monday 00:00:00
   const daysUntilNextMonday = (8 - day) % 7 || 7;
-  
   const nextMonday = new Date(istTime);
   nextMonday.setDate(istTime.getDate() + daysUntilNextMonday);
   nextMonday.setHours(0, 0, 0, 0);
-  
-  // Convert nextMonday IST back to UTC
   const nextMondayUTC = new Date(nextMonday.getTime() - (5.5 * 3600000));
-  
-  // Return the local time representation of that UTC time
   return new Date(nextMondayUTC.getTime() - new Date().getTimezoneOffset() * 60000);
 }
 
 export default function Leaderboard() {
-  const { getLiveLeaderboard, userXp, forceReset } = useLeaderboard();
+  const { user } = useAuth();
+  const { userXp, forceReset } = useLeaderboard();
+  
+  const [leaders, setLeaders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  
   const [searchQuery, setSearchQuery] = useState("");
   const [timeLeft, setTimeLeft] = useState<{ d: number; h: number; m: number; s: number }>({ d: 0, h: 0, m: 0, s: 0 });
   const [showWinners, setShowWinners] = useState(false);
 
-  const leaders = getLiveLeaderboard();
+  useEffect(() => {
+    let active = true;
+    const fetchLeaders = async () => {
+      try {
+        const topUsers = await ApiService.getTopUsers(20);
+        if (active) {
+           const formatted = topUsers.map((u, i) => ({
+             id: u.id,
+             name: u.username || `User_${u.id.substring(0, 5)}`,
+             avatarSeed: u.username || u.id,
+             finalScore: u.points || 0,
+             isCurrentUser: user?.uid === u.id,
+             rank: i + 1,
+             trustScore: u.security_stats ? (u.security_stats.is_modded ? 30 : 95) : 100,
+           }));
+           setLeaders(formatted);
+        }
+      } catch (err) {
+        console.error("Failed to fetch leaders", err);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    fetchLeaders();
+    return () => { active = false; };
+  }, [user]);
+
   const currentUser = leaders.find(l => l.isCurrentUser);
   const filteredLeaders = leaders.filter(l => l.name.toLowerCase().includes(searchQuery.toLowerCase()));
 

@@ -41,12 +41,33 @@ const CountUp = ({
   );
 };
 
+import { useAuth } from "../lib/AuthContext";
+import { ApiService } from "../lib/ApiService";
+
 export default function DailyCheckin() {
+  const { user } = useAuth();
   const { addPoints } = useWallet();
   const { xpConfig, addXp } = useLeaderboard();
   
-  const [streak, setStreak] = useState(3); // Mock streak
-  const [claimedToday, setClaimedToday] = useState(false);
+  const [streak, setStreak] = useState(() => {
+    return user?.dailyCheckin?.currentStreak || 0;
+  });
+
+  const [claimedToday, setClaimedToday] = useState(() => {
+    if (user?.dailyCheckin?.lastCheckinTimestamp) {
+      if (new Date(user.dailyCheckin.lastCheckinTimestamp).toDateString() === new Date().toDateString()) return true;
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (user?.dailyCheckin) {
+      setStreak(user.dailyCheckin.currentStreak || 0);
+      const lastCheckin = new Date(user.dailyCheckin.lastCheckinTimestamp || 0).toDateString();
+      setClaimedToday(lastCheckin === new Date().toDateString());
+    }
+  }, [user]);
+
   const [showReward, setShowReward] = useState(false);
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
   const [timeLeft, setTimeLeft] = useState("");
@@ -95,33 +116,70 @@ export default function DailyCheckin() {
     return () => clearInterval(timer);
   }, []);
 
-  // Mock schedule
-  const days = [
-    { day: 1, points: 50, xp: 10, claimed: true },
-    { day: 2, points: 75, xp: 15, claimed: true },
-    { day: 3, points: 100, xp: 20, claimed: true },
-    { day: 4, points: 150, xp: 30, claimed: false, isToday: true },
-    { day: 5, points: 200, xp: 40, claimed: false },
-    { day: 6, points: 300, xp: 50, claimed: false },
-    { day: 7, points: 500, xp: 100, claimed: false, isSpecial: true },
-  ];
+  const days = Array.from({ length: 7 }).map((_, i) => {
+    const dayNum = i + 1;
+    const basePts = [50, 75, 100, 150, 200, 300, 500];
+    const baseXp = [10, 15, 20, 30, 40, 50, 100];
+    const isSpecial = dayNum === 7;
+    const currentDayInCycle = (streak % 7) + 1;
+    
+    let isClaimed = false;
+    let isToday = false;
 
-  const handleClaim = () => {
+    if (dayNum < currentDayInCycle) {
+      isClaimed = true;
+    } else if (dayNum === currentDayInCycle) {
+      if (claimedToday) {
+        isClaimed = true;
+      } else {
+        isToday = true;
+      }
+    } else if (streak > 0 && streak % 7 === 0 && dayNum < 7) {
+      // If exactly 7 streak and today we claimed 7
+      if (claimedToday) {
+        isClaimed = true;
+      }
+    }
+
+    return {
+      day: dayNum,
+      points: basePts[i],
+      xp: baseXp[i],
+      claimed: isClaimed,
+      isToday,
+      isSpecial,
+    };
+  });
+
+  const handleClaim = async () => {
     if (claimedToday) return;
+    if (!user) return;
     
-    // Day 4 values
-    addPoints(150);
-    addXp(30);
+    const currentDayInCycle = (streak % 7) + 1;
+    const currentDayConfig = days.find(d => d.day === currentDayInCycle) || days[0];
     
-    setClaimedToday(true);
-    setStreak(4);
-    
-    // Show splash animation
-    setShowReward(true);
-    setTimeout(() => setShowReward(false), 3500);
+    try {
+      await ApiService.dailyCheckin(user.uid, streak);
+      
+      // Update ui locally immediately so it feels responsive
+      addPoints(currentDayConfig.points);
+      addXp(currentDayConfig.xp);
+      
+      setClaimedToday(true);
+      const newStreak = streak + 1;
+      setStreak(newStreak);
+      
+      // Show splash animation
+      setShowReward(true);
+      setTimeout(() => setShowReward(false), 3500);
+    } catch (err) {
+      console.error("Checkin failed", err);
+    }
   };
 
-  const progressPercentage = ((streak + (claimedToday ? 0 : 0)) / 7) * 100;
+  const progressPercentage = ((streak % 7) / 7) * 100;
+
+  const currentReward = days.find(d => d.isToday) || days[0];
 
   return (
     <div className="min-h-screen pb-20 relative font-['Varela_Round']">
@@ -131,16 +189,16 @@ export default function DailyCheckin() {
         </div>
       )}
       
-      <div className="absolute top-0 right-0 w-full md:w-[60%] h-[50%] bg-emerald-500/10 blur-[150px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-full md:w-[50%] h-[40%] bg-blue-500/10 blur-[150px] rounded-full pointer-events-none" />
+      <div className="absolute top-0 right-0 w-full md:w-[60%] h-[50%] bg-amber-500/10 blur-[150px] rounded-full pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-full md:w-[50%] h-[40%] bg-purple-500/10 blur-[150px] rounded-full pointer-events-none" />
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 relative z-10 pt-4">
         
         {/* Header Header */}
         <div className="bg-white/60 dark:bg-[#0b1121]/60 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-3xl p-8 sm:p-10 mb-8 shadow-sm relative overflow-hidden flex flex-col md:flex-row items-center gap-8 text-center md:text-left">
-          <div className="absolute top-[-50px] left-[-50px] w-64 h-64 bg-gradient-to-br from-emerald-400/20 to-teal-400/20 blur-[60px] rounded-full pointer-events-none" />
+          <div className="absolute top-[-50px] left-[-50px] w-64 h-64 bg-gradient-to-br from-amber-400/20 to-orange-400/20 blur-[60px] rounded-full pointer-events-none" />
           
-          <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center shadow-xl shadow-emerald-500/30 border-4 border-white/20 shrink-0 relative">
+          <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-yellow-400 to-orange-500 flex items-center justify-center shadow-xl shadow-amber-500/30 border-4 border-white/20 shrink-0 relative">
             <CalendarCheck className="w-10 h-10 text-white" />
             <div className="absolute -top-2 -right-2 bg-gradient-to-r from-orange-400 to-amber-500 text-white text-xs font-bold px-3 py-1 rounded-full border-2 border-white dark:border-slate-900 shadow-md">
               {streak} Days🔥
@@ -162,7 +220,7 @@ export default function DailyCheckin() {
                 "py-3 px-8 rounded-2xl font-black transition-all flex flex-col items-center justify-center gap-1 w-full max-w-sm z-10 tracking-widest",
                 claimedToday 
                   ? "bg-slate-100 dark:bg-white/5 text-slate-500 border-2 border-slate-200 dark:border-white/10 shadow-none cursor-not-allowed" 
-                  : "bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white shadow-xl shadow-emerald-500/30 hover:scale-[1.02] active:scale-95 border-2 border-emerald-400/50 uppercase text-lg"
+                  : "bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-400 hover:to-orange-500 text-white shadow-xl shadow-orange-500/30 hover:scale-[1.02] active:scale-95 border-2 border-orange-400/50 uppercase text-lg"
               )}
             >
               {claimedToday ? (
@@ -174,7 +232,7 @@ export default function DailyCheckin() {
                   <span className="text-xs font-bold font-mono tracking-normal opacity-80 flex items-center gap-1"><Clock className="w-3 h-3" /> Next in {timeLeft}</span>
                 </>
               ) : (
-                <div className="flex items-center gap-2 text-lg uppercase">Claim +150 PTS</div>
+                <div className="flex items-center gap-2 text-lg uppercase">Claim +{currentReward.points} PTS</div>
               )}
             </button>
           </div>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { useAuth } from "./lib/AuthContext";
 import {
   Home,
   CheckCircle,
@@ -42,6 +43,7 @@ import About from "./pages/About";
 import DailyCheckin from "./pages/DailyCheckin";
 import Referrals from "./pages/Referrals";
 import SocialPromo from "./pages/SocialPromo";
+import GetKey from "./pages/GetKey";
 import { useTrustScore } from "./hooks/useTrustScore";
 
 import { useGender } from "./hooks/useGender";
@@ -85,39 +87,43 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
 }
 
 // Main App Layout
+
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { user, loading, logout } = useAuth();
+  const isAuthenticated = !!user;
   const [activeTab, setActiveTab] = useState("dashboard");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const { trustState, toastMessage } = useTrustScore();
   const { getAvatarUrl } = useGender();
 
-  // Check local storage for session
+  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(true);
+
   useEffect(() => {
-    const session = localStorage.getItem("decaptcha_auth");
-    if (session === "true") {
-      setIsAuthenticated(true);
-      const role = localStorage.getItem("decaptcha_role");
-      if (role === "admin") setActiveTab("admin");
+    if (activeTab === "notifications") {
+      setHasUnreadNotifications(false);
     }
-  }, []);
+  }, [activeTab]);
 
   const handleUnlock = (role: "user" | "admin" = "user") => {
-    localStorage.setItem("decaptcha_auth", "true");
-    localStorage.setItem("decaptcha_role", role);
-    setIsAuthenticated(true);
+    // Left for Landing to call after successful OTP Verification
     setActiveTab(role === "admin" ? "admin" : "dashboard");
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("decaptcha_auth");
-    localStorage.removeItem("decaptcha_role");
-    setIsAuthenticated(false);
-    setActiveTab("dashboard");
+    logout();
+    setActiveTab("landing"); // changed to landing
   };
 
-  if (trustState.banned) {
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-navy flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (trustState.banned || user?.security_stats?.status === "banned") {
     return (
       <div className="min-h-screen bg-navy text-slate-100 flex flex-col items-center justify-center p-6 text-center font-sans">
         <motion.div
@@ -180,14 +186,16 @@ export default function App() {
           return <HowItWorks />;
         case "about":
           return <About />;
+        case "get-key":
+          return <GetKey />;
         default:
           return null;
       }
     };
 
     return (
-      <div className="min-h-screen bg-navy text-slate-100 flex flex-col font-sans overflow-x-hidden selection:bg-blue-500/30">
-        <header className="fixed top-0 inset-x-0 z-50 glass-panel border-x-0 border-t-0 bg-navy/80">
+      <div className="min-h-screen bg-slate-50 dark:bg-navy text-slate-900 dark:text-slate-100 flex flex-col font-sans overflow-x-hidden selection:bg-blue-500/30 transition-colors duration-200">
+        <header className="fixed top-0 inset-x-0 z-50 border-b border-slate-200 dark:border-white/10 bg-white/80 dark:bg-navy/80 backdrop-blur-xl">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
             <div
               className="flex items-center gap-3 cursor-pointer"
@@ -198,18 +206,23 @@ export default function App() {
                   fingerprint
                 </span>
               </div>
-              <span className="text-2xl font-bold tracking-tight text-slate-100 drop-shadow-sm">
+              <span className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 drop-shadow-sm">
                 DeCaptcha
               </span>
             </div>
 
             <div className="flex items-center gap-4">
-              <ThemeToggle />
+              {activeTab !== "get-key" && <ThemeToggle />}
               <button
                 onClick={() => setActiveTab("landing")}
-                className="bg-white/10 hover:bg-white/20 text-white px-5 py-2.5 rounded-xl font-medium transition-all"
+                className={`transition-all flex items-center justify-center ${
+                  activeTab === "get-key" 
+                    ? "p-2.5 rounded-full bg-slate-200/50 dark:bg-white/10 hover:bg-slate-300/50 dark:hover:bg-white/20 text-slate-700 dark:text-white" 
+                    : "bg-slate-200/50 hover:bg-slate-300/50 dark:bg-white/10 dark:hover:bg-white/20 text-slate-800 dark:text-white px-5 py-2.5 rounded-xl font-medium"
+                }`}
+                title="Back to Home"
               >
-                Back to Home
+                {activeTab === "get-key" ? <Home className="w-5 h-5" /> : "Back to Home"}
               </button>
             </div>
           </div>
@@ -286,6 +299,8 @@ export default function App() {
         return <About />;
       case "admin":
         return <Admin />;
+      case "get-key":
+        return <GetKey />;
       default:
         return <Dashboard onNavigate={setActiveTab} />;
     }
@@ -424,7 +439,9 @@ export default function App() {
             className="p-2 bg-white/5 rounded-lg text-slate-300 border border-white/5 hover:text-white relative"
           >
             <Bell className="w-5 h-5" />
-            <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-navy"></span>
+            {hasUnreadNotifications && (
+              <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-navy"></span>
+            )}
           </button>
         </header>
 

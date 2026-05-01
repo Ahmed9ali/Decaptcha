@@ -1,33 +1,40 @@
 import { useState, useEffect } from "react";
+import { useAuth } from "../lib/AuthContext";
 
 export interface WalletState {
+  userId?: string;
   balance: number;
   points: number;
   totalTextSolved: number;
+  totalImageSolved: number;
   streak: number;
   lastSolveTime: number;
   todayEarnings: number;
 }
 
 export function useWallet() {
-  const [wallet, setWallet] = useState<WalletState>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("decaptcha_wallet");
-      if (saved) return JSON.parse(saved);
-    }
-    return {
-      balance: 0,
-      points: 50,
-      totalTextSolved: 0,
-      streak: 0,
-      lastSolveTime: Date.now(),
-      todayEarnings: 0,
-    };
+  const { user } = useAuth();
+  
+  const [wallet, setWallet] = useState<WalletState>({
+    balance: user?.balance || 0,
+    points: user?.points || 0,
+    totalTextSolved: user?.captchaStats?.text?.dailyCount || 0,
+    totalImageSolved: 0,
+    streak: 0,
+    lastSolveTime: Date.now(),
+    todayEarnings: 0,
   });
 
   useEffect(() => {
-    localStorage.setItem("decaptcha_wallet", JSON.stringify(wallet));
-  }, [wallet]);
+    if (user) {
+      setWallet(prev => ({
+        ...prev,
+        balance: user.balance || 0,
+        points: user.points || 0,
+        totalTextSolved: user.captchaStats?.text?.dailyCount || prev.totalTextSolved,
+      }));
+    }
+  }, [user]);
 
   const addReward = (amount: number) => {
     setWallet((prev) => {

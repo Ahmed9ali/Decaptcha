@@ -13,6 +13,7 @@ export default function Tasks({ onNavigate }: { onNavigate?: (tab: string) => vo
   // Tasks Math
   const socialCompleted = completedTaskIds.length;
   const socialTotal = socialTasks.length;
+  const totalSocialXP = socialTasks.reduce((acc, task) => acc + task.rewardPoints, 0);
   const socialProgress = socialTotal > 0 ? (socialCompleted / socialTotal) * 100 : 0;
   
   const accuracyGoal = 100;
@@ -63,7 +64,7 @@ export default function Tasks({ onNavigate }: { onNavigate?: (tab: string) => vo
                 <Share2 className="w-6 h-6" />
               </div>
               <span className="font-bold font-mono text-blue-600 dark:text-blue-400 bg-blue-100/50 dark:bg-blue-500/10 px-3 py-1 rounded-lg border border-blue-200 dark:border-blue-500/20">
-                Variable XP
+                {totalSocialXP} XP
               </span>
             </div>
             <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Social Promo Drop</h3>

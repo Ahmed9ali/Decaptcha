@@ -27,7 +27,7 @@ import {
 import { useSocialPromos } from "../hooks/useSocialPromos";
 import { useLeaderboard } from "../hooks/useLeaderboard";
 import { usePolicies } from "../hooks/usePolicies";
-import { useFaqs, Faq } from "../hooks/useFaqs";
+import { useFaqs, Faq } from "../lib/useFaqs";
 import { useMessages, Message } from "../hooks/useMessages";
 import { motion } from "motion/react";
 
