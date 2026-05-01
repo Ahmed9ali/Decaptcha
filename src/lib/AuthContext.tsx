@@ -66,7 +66,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             username: `User${uid.substring(0, 4)}`,
             security_stats: { status: "active", is_modded: false, is_vpn: false }
           };
-          
           await set(userRef, newUser);
           setUser({ uid, ...newUser });
         }
@@ -86,7 +85,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       // 10 second timeout for Firebase RTDB connection
       const timeoutPromise = new Promise((_, reject) => {
-        const errorMsg = "Could not connect to Firebase database. Check that VITE_FIREBASE_API_KEY and VITE_FIREBASE_DATABASE_URL are correct in your App Secrets.";
+        const errorMsg = "Firebase connection timed out. Please check your internet connection or verify the 'web_auth' node exists in your Firebase Database Rules.";
         setTimeout(() => reject(new Error(errorMsg)), 10000);
       });
 
@@ -117,7 +116,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error("Invalid access key");
       }
     } catch (err: any) {
-      throw err;
+      // THIS will print the actual Firebase error (like Permission Denied) to your browser console!
+      console.error("REAL FIREBASE ERROR:", err);
+      throw new Error(err.message || "Failed to log in.");
     }
   };
 
