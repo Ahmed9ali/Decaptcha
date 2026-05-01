@@ -80,44 +80,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loginWithOtp = async (otp: string) => {
+    const loginWithOtp = async (otp: string) => {
     try {
-      const timeoutPromise = new Promise((_, reject) => {
-        const errorMsg = "Firebase connection timed out. Check your browser shields or internet.";
-        setTimeout(() => reject(new Error(errorMsg)), 25000); // 25 seconds
-      });
+      // 1. Check if Vite actually loaded the env variables!
+      const dbUrl = import.meta.env.VITE_FIREBASE_DATABASE_URL;
+      if (!dbUrl) {
+        throw new Error("CRITICAL: Database URL is empty! Vite did not load your .env file correctly.");
+      }
 
-      const webAuthRef = ref(db, "web_auth");
-      const q = query(webAuthRef, orderByChild("otp"), equalTo(otp));
-      const snapshot = await Promise.race([get(q), timeoutPromise]) as any;
+      // 2. Format the URL for a raw REST API fetch (bypassing the Firebase SDK)
+      const cleanDbUrl = dbUrl.replace(/\/$/, '');
+      const fetchUrl = `${cleanDbUrl}/web_auth.json?orderBy="otp"&equalTo="${otp}"`;
 
-      if (snapshot.exists()) {
-        let matchedUid = null;
-        let valid = false;
-        
-        snapshot.forEach((childSnapshot: any) => {
-          const data = childSnapshot.val();
-          if (data.expires_at > Date.now()) {
-            matchedUid = childSnapshot.key;
-            valid = true;
-          }
-        });
+      // 3. Set a 10-second timeout for the fetch
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-        if (valid && matchedUid) {
+      // 4. Make the raw HTTP request
+      const response = await fetch(fetchUrl, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`Firebase API rejected the request: HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // 5. Check if we found a matching OTP
+      if (data && Object.keys(data).length > 0) {
+        const matchedUid = Object.keys(data)[0];
+        const authData = data[matchedUid];
+
+        if (authData.expires_at > Date.now()) {
           localStorage.setItem("decaptcha_uid", matchedUid);
-          await subscribeToUser(matchedUid);
+          await subscribeToUser(matchedUid); 
           return;
         } else {
-          throw new Error("OTP expired.");
+          throw new Error("OTP expired. Please request a new one.");
         }
       } else {
         throw new Error("Invalid access key.");
       }
+
     } catch (err: any) {
-      alert("DEBUG ERROR: " + (err.message || err.toString()));
-      console.error("REAL FIREBASE ERROR:", err);
+      // Notice the popup now says "REST FETCH ERROR" so we know this new code is running!
+      alert("REST FETCH ERROR: " + (err.message || err.toString()));
+      console.error("RAW FETCH ERROR:", err);
       throw new Error(err.message || "Failed to log in.");
     }
   };
+
 
   const logout = () => {
     localStorage.removeItem("decaptcha_uid");
