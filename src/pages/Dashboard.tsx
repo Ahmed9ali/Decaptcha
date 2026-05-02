@@ -11,13 +11,14 @@ import {
   ArrowRight,
   Smartphone,
   Coins,
-  Star
+  Star,
+  TrendingUp
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useTrustScore } from "../hooks/useTrustScore";
-import { useAuth } from "../lib/AuthContext"; // Import Auth to get the real user object
+import { useAuth } from "../lib/AuthContext";
 import { ref, onValue } from "firebase/database";
-import { db } from "../lib/firebase"; // Import db for notifications
+import { db } from "../lib/firebase";
 
 const CountUp = ({
   value,
@@ -61,23 +62,22 @@ export default function Dashboard({
   onNavigate: (tab: string) => void;
 }) {
   const { trustState, getStatus } = useTrustScore();
-  const { user } = useAuth(); // Get real Firebase user data
+  const { user } = useAuth();
   const status = getStatus(trustState.score);
 
   const [notifications, setNotifications] = useState<any[]>([]);
 
-  // Safely extract all required values from the user node (defaults to 0 if they don't exist yet)
-  // Fetching balance from adState as shown in your screenshot!
-  const userBalance = (user as any)?.adState?.balance || 0;
+  // CORRECTED: Fetching balance directly from the user node root
+  const userBalance = user?.balance || 0;
   const userPoints = user?.points || 0;
   
-  // New Web nodes exactly as requested
+  // Custom Web Nodes
   const webTextCaptcha = (user as any)?.web_text_captcha || 0;
   const webStreak = (user as any)?.web_streak || 0;
   const webRank = (user as any)?.web_rank || "-";
   const webXp = (user as any)?.web_xp || 0;
 
-  // Real-time Notification Fetcher
+  // Live Notifications Fetcher
   useEffect(() => {
     if (!user?.uid) return;
     const notifRef = ref(db, `notifications/${user.uid}`);
@@ -85,10 +85,9 @@ export default function Dashboard({
     const unsubscribe = onValue(notifRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
-        // Convert object to array and reverse to show newest first
         const notifArray = Object.keys(data)
           .map((key) => ({ id: key, ...data[key] }))
-          .reverse();
+          .reverse(); // Newest first
         setNotifications(notifArray);
       } else {
         setNotifications([]);
@@ -100,16 +99,14 @@ export default function Dashboard({
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-24 lg:pb-8">
-      {/* Sleek Welcome Section (Removed Avatars/Gender) */}
+      {/* 1. WELCOME SECTION (Cleaned up, no avatars) */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
-            Welcome back, {user?.username || "Solver"}!
-          </h1>
-          <p className="text-slate-400 text-sm mt-1">Ready to earn some rewards today?</p>
+          <h1 className="text-2xl font-bold">Welcome back, {user?.username || "Solver"}!</h1>
         </div>
       </div>
 
+      {/* Daily Check-in Banner */}
       <div 
         onClick={() => onNavigate("daily")}
         className="glass-panel p-4 rounded-2xl border border-emerald-500/30 bg-gradient-to-r from-emerald-500/10 to-teal-500/5 cursor-pointer hover:bg-emerald-500/20 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg shadow-emerald-500/5 group"
@@ -131,43 +128,50 @@ export default function Dashboard({
         </button>
       </div>
 
-      {/* Cleaned Up Balance & Points Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        
-        {/* CURRENT BALANCE */}
-        <div className="glass-panel p-6 md:p-8 rounded-3xl relative overflow-hidden bg-gradient-to-br from-blue-600/10 to-indigo-600/5 group border border-blue-500/20 flex flex-col justify-center">
+        {/* 2. CURRENT BALANCE CARD (Original UI, bottom grids removed) */}
+        <div className="glass-panel p-6 md:p-8 rounded-3xl relative overflow-hidden bg-gradient-to-br from-blue-600/10 to-indigo-600/5 group border border-blue-500/20">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 via-transparent to-purple-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
           <div className="absolute -top-20 -right-20 w-64 h-64 bg-blue-500/10 rounded-full blur-[80px] pointer-events-none" />
 
-          <div className="flex items-center gap-2 bg-blue-500/20 border border-blue-500/30 px-3 py-1.5 rounded-full shadow-sm text-blue-100 backdrop-blur-sm w-fit mb-4">
-            <Wallet className="w-4 h-4 text-blue-400 drop-shadow-[0_0_8px_rgba(96,165,250,0.8)]" />
-            <span className="font-bold uppercase tracking-widest text-xs text-shadow-sm">
-              Current Balance
-            </span>
+          <div className="flex justify-between items-start mb-6 relative z-10">
+            <div className="flex items-center gap-2 bg-blue-500/20 border border-blue-500/30 px-3 py-1.5 rounded-full shadow-sm text-blue-100 backdrop-blur-sm">
+              <Wallet className="w-4 h-4 text-blue-400 drop-shadow-[0_0_8px_rgba(96,165,250,0.8)]" />
+              <span className="font-bold uppercase tracking-widest text-xs text-shadow-sm">
+                Current Balance
+              </span>
+            </div>
           </div>
 
-          <div className="relative z-10 my-4">
+          <div className="relative z-10 mb-2 mt-4">
             <h2 className="text-5xl md:text-6xl font-bold tracking-tighter text-white filter drop-shadow-lg font-mono flex items-baseline gap-1">
-              <span className="text-blue-400/80 transition-all font-sans">$</span>
+              <span className="text-blue-400/80 transition-all font-sans">
+                $
+              </span>
               <CountUp value={userBalance} isCurrency={true} />
             </h2>
           </div>
+          {/* Earnings & Lifetime removed as requested */}
         </div>
 
-        {/* TOTAL POINTS */}
-        <div className="glass-panel p-6 md:p-8 rounded-3xl relative overflow-hidden bg-gradient-to-br from-orange-600/10 to-pink-600/5 border border-orange-500/20 group flex flex-col justify-center">
+        {/* 3. TOTAL POINTS CARD (Original UI, bottom grids removed) */}
+        <div className="glass-panel p-6 md:p-8 rounded-3xl relative overflow-hidden bg-gradient-to-br from-orange-600/10 to-pink-600/5 border border-orange-500/20 group flex flex-col">
           <div className="absolute inset-0 bg-gradient-to-r from-orange-500/20 via-transparent to-pink-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
           <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-orange-500/10 rounded-full blur-[80px] pointer-events-none" />
 
-          <div className="flex items-center gap-2 bg-orange-500/20 border border-orange-500/30 px-3 py-1.5 rounded-full shadow-sm text-orange-100 backdrop-blur-sm w-fit mb-4">
-            <Coins className="w-4 h-4 text-orange-400 drop-shadow-[0_0_8px_rgba(251,146,60,0.8)]" />
-            <span className="font-bold uppercase tracking-widest text-xs text-shadow-sm">
-              Total Points
-            </span>
+          <div className="flex justify-between items-start mb-6 relative z-10">
+            <div
+              className="flex items-center gap-2 bg-orange-500/20 border border-orange-500/30 px-3 py-1.5 rounded-full shadow-sm text-orange-100 backdrop-blur-sm"
+            >
+              <Coins className="w-4 h-4 text-orange-400 drop-shadow-[0_0_8px_rgba(251,146,60,0.8)]" />
+              <span className="font-bold uppercase tracking-widest text-xs text-shadow-sm">
+                Total Points
+              </span>
+            </div>
           </div>
 
           {userPoints === 0 ? (
-            <div className="relative z-10 flex flex-col items-start justify-center h-[100px] my-4">
+            <div className="relative z-10 flex flex-col items-start justify-center h-[100px] mb-2 mt-4">
               <p className="text-slate-300 text-sm mb-4 max-w-[250px] leading-relaxed">
                 Watch ads in app to earn points and solve captchas.
               </p>
@@ -179,7 +183,7 @@ export default function Dashboard({
               </button>
             </div>
           ) : (
-            <div className="relative z-10 my-4 flex items-end justify-between">
+            <div className="relative z-10 mb-2 mt-4 flex items-end justify-between">
               <div>
                 <h2 className="text-5xl md:text-6xl font-bold tracking-tighter text-white filter drop-shadow-lg font-mono flex items-center">
                   <CountUp value={userPoints} />
@@ -190,11 +194,11 @@ export default function Dashboard({
               </div>
             </div>
           )}
+          {/* Earned, Used, and Total removed as requested */}
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
         {/* Trust Score */}
         <div className="glass-panel p-6 rounded-3xl relative overflow-hidden group border border-glass-border flex flex-col justify-center shadow-lg">
           <div
@@ -207,7 +211,9 @@ export default function Dashboard({
               <ShieldCheck className={`w-5 h-5 ${status.color}`} />
               Trust Score
             </h3>
-            <span className={`px-2 py-1 bg-white/5 rounded-full text-[10px] font-bold tracking-wider ${status.color} uppercase border border-white/5 backdrop-blur-sm`}>
+            <span
+              className={`px-2 py-1 bg-white/5 rounded-full text-[10px] font-bold tracking-wider ${status.color} uppercase border border-white/5 backdrop-blur-sm`}
+            >
               {status.label}
             </span>
           </div>
@@ -234,7 +240,7 @@ export default function Dashboard({
           </div>
         </div>
 
-        {/* Captchas Solved & New Web Nodes Stats */}
+        {/* 4. WEB STATS (Captchas Solved Today replaced with web_text_captcha & web_xp) */}
         <div className="lg:col-span-2 glass-panel p-8 rounded-3xl relative overflow-hidden bg-gradient-to-br from-blue-900/20 to-purple-900/10 border border-blue-500/10 flex flex-col justify-between group shadow-lg">
           <div className="flex justify-between items-start mb-6">
             <div className="flex items-center gap-3">
@@ -243,16 +249,16 @@ export default function Dashboard({
               </div>
               <div>
                 <h3 className="text-xl font-bold text-white">
-                  Captchas Solved Today
+                  Captchas Solved (Web)
                 </h3>
                 <p className="text-sm text-slate-400">
-                  Total text captchas completed
+                  Total text captchas solved on web
                 </p>
               </div>
             </div>
             <div className="text-right">
               <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">
-                Total Web XP
+                Web XP
               </p>
               <p className="text-xl font-bold text-purple-400 font-mono">
                 {webXp.toLocaleString()}
@@ -262,12 +268,11 @@ export default function Dashboard({
 
           <div className="mt-8 flex items-end gap-6">
             <h2 className="text-7xl font-bold text-white font-mono drop-shadow-md tracking-tighter">
-              {/* Pointing to your new web_text_captcha node */}
               <CountUp value={webTextCaptcha} />
             </h2>
           </div>
           
-          <div className="mt-6 flex flex-wrap gap-4 bg-navy/40 p-4 rounded-2xl border border-white/5 backdrop-blur-md">
+          <div className="mt-6 flex flex-wrap gap-4">
             <div className="flex items-center gap-2">
               <Zap className="w-4 h-4 text-orange-400" />
               <span className="text-sm font-bold text-slate-300">
@@ -278,7 +283,7 @@ export default function Dashboard({
             <div className="flex items-center gap-2">
               <Trophy className="w-4 h-4 text-yellow-400" />
               <span className="text-sm font-bold text-slate-300">
-                Global Rank #{webRank}
+                Rank #{webRank}
               </span>
             </div>
             <div className="w-px h-5 bg-white/10"></div>
@@ -293,8 +298,6 @@ export default function Dashboard({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Progress Targets */}
         <div className="lg:col-span-2 glass-panel p-6 md:p-8 rounded-3xl border border-glass-border">
           <div className="flex items-center justify-between mb-8">
             <div>
@@ -303,7 +306,7 @@ export default function Dashboard({
                 Daily Progress
               </h3>
               <p className="text-sm text-slate-400 mt-1">
-                Track your daily solving & earning targets
+                Track your daily solving targets
               </p>
             </div>
           </div>
@@ -317,8 +320,7 @@ export default function Dashboard({
                 </div>
                 <div className="h-3 w-full bg-navy rounded-full overflow-hidden border border-glass-border shadow-inner">
                   <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${Math.min(100, (webTextCaptcha / 500) * 100)}%` }}
+                    initial={{ width: 0 }} animate={{ width: `${Math.min(100, (webTextCaptcha / 500) * 100)}%` }}
                     transition={{ duration: 1.5, ease: "easeOut" }}
                     className="h-full bg-gradient-to-r from-blue-600 to-blue-400 rounded-full"
                   />
@@ -344,9 +346,9 @@ export default function Dashboard({
           </div>
         </div>
 
-        {/* Dynamic Notifications Panel */}
-        <div className="glass-panel p-6 rounded-3xl border border-glass-border flex flex-col h-[350px]">
-          <div className="flex items-center justify-between mb-6 shrink-0">
+        {/* 5. LIVE NOTIFICATIONS */}
+        <div className="glass-panel p-6 rounded-3xl border border-glass-border flex flex-col h-full">
+          <div className="flex items-center justify-between mb-6">
             <h3 className="text-xl font-bold flex items-center gap-2">
               <Bell className="w-5 h-5 text-slate-400" /> Notifications
             </h3>
@@ -357,9 +359,9 @@ export default function Dashboard({
             )}
           </div>
 
-          <div className="flex-1 space-y-3 overflow-y-auto pr-2 custom-scrollbar">
+          <div className="flex-1 space-y-4 overflow-y-auto pr-2 custom-scrollbar max-h-[250px]">
             {notifications.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-slate-500">
+              <div className="h-full flex flex-col items-center justify-center text-slate-500 pt-8">
                 <Bell className="w-8 h-8 mb-2 opacity-20" />
                 <p className="text-sm">No new notifications</p>
               </div>
@@ -370,7 +372,7 @@ export default function Dashboard({
                     <Bell className="w-5 h-5 text-blue-400" />
                   </div>
                   <div className="flex-1">
-                    <p className="text-sm font-bold text-white">{notif.title || "System Message"}</p>
+                    <p className="text-sm font-bold text-white">{notif.title || "System Notification"}</p>
                     <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">
                       {notif.message || notif.body || "You have a new update."}
                     </p>
